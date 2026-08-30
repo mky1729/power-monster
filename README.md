@@ -13,3 +13,12 @@
 プレイ版: https://power-monstar.haruneko70.chatgpt.site
 
 パワモン画像は現在仮シルエットで、正式画像へ差し替え予定です。
+
+## 開発
+
+```bash
+npm ci
+npm run dev
+```
+
+本番用ビルドは `npm run build` で確認できます。
