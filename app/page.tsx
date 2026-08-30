@@ -26,6 +26,8 @@ type SaveData = { story: number; captured: boolean };
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
 const GRID_H = 8;
+const ALLY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/ally-001.jpeg";
+const ENEMY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/enemy-001.jpeg";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
@@ -235,7 +237,7 @@ export default function Home() {
         <div className="result-orbit" aria-hidden="true" />
         <section className="result-card">
           <p className="eyebrow">LINK COMPLETE</p>
-          <MonsterSilhouette variant="small" />
+          <CharacterArtwork side="enemy" variant="result" />
           <h1>未確認パワモンを記録</h1>
           <div className="file-number">FILE No. 001</div>
           <p>消えた街の記憶を持つパワモン。眠っている間、知らない世界の言葉を話す。</p>
@@ -296,7 +298,7 @@ function GameMap({ mapId, position, captured }: { mapId: MapId; position: Positi
           <>
             <MapObject x={1} y={6} className="return-gate" label="帰還ゲート"><span className="gate-ring" /></MapObject>
             <MapObject x={3} y={4} className="memory-sign" label="壊れた標識">?</MapObject>
-            {!captured && <MapObject x={7} y={2} className="wild-signal" label="未知の反応"><MonsterSilhouette variant="map" /></MapObject>}
+            {!captured && <MapObject x={7} y={2} className="wild-signal" label="未知の反応"><CharacterArtwork side="enemy" variant="map" /></MapObject>}
           </>
         )}
         <MapObject x={position.x} y={position.y} className="player" label="主人公"><span className="player-arrow" /></MapObject>
@@ -309,10 +311,18 @@ function MapObject({ x, y, className, label, children }: { x: number; y: number;
   return <div className={`map-object ${className}`} style={{ left: `${x * 10}%`, top: `${y * 12.5}%` }} aria-label={label}>{children}</div>;
 }
 
-function MonsterSilhouette({ variant = "battle" }: { variant?: "battle" | "map" | "small" }) {
+function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"; variant?: "battle" | "map" | "result" }) {
   return (
-    <div className={`monster-silhouette ${variant}`} aria-label="未確認パワモンのシルエット">
-      <span className="unknown-mark">?</span><i className="signal-dot dot-one" /><i className="signal-dot dot-two" /><i className="signal-dot dot-three" />
+    <div className={`character-art ${side} ${variant}`}>
+      {/* User-provided artwork is served from the project repository. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={side === "ally" ? ALLY_IMAGE : ENEMY_IMAGE}
+        alt={side === "ally" ? "味方パワモン" : "敵パワモン"}
+        draggable={false}
+      />
+      <span className="scan-corner corner-one" />
+      <span className="scan-corner corner-two" />
     </div>
   );
 }
@@ -388,10 +398,10 @@ function Battle({ onVictory }: { onVictory: () => void }) {
       <section className="battle-field">
         <div className="enemy-unit">
           <div className="unit-info enemy-info"><span>未確認個体</span><strong>UNKNOWN</strong><HpBar value={enemyHp} max={42} /></div>
-          <MonsterSilhouette />
+          <CharacterArtwork side="enemy" />
         </div>
         <div className="player-unit">
-          <div className="partner-placeholder" aria-label="味方パワモン仮表示"><Sparkles /><span>LINK-01</span></div>
+          <CharacterArtwork side="ally" />
           <div className="unit-info player-info"><span>リンク個体</span><strong>シグナル01</strong><HpBar value={playerHp} max={36} /></div>
         </div>
       </section>
