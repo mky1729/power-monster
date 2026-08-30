@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Scene = "title" | "intro" | "map" | "battle" | "result";
-type MapId = "lab" | "unknown";
+type Scene = "title" | "intro" | "map" | "battle" | "battle2" | "result" | "result2";
+type MapId = "lab" | "unknown" | "dream";
 type Position = { x: number; y: number };
-type Dialog = { lines: string[]; index: number; complete?: "partner" | "none" };
-type SaveData = { story: number; captured: boolean };
+type Dialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
+type SaveData = { story: number; captured: boolean; fragments?: number[] };
 
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
@@ -41,6 +41,13 @@ const professorLines = [
   "保管中のモンスターコアが、君にだけ反応している。",
   "……起動した！ 未確認パワモンとのリンクを確認！",
   "その子と一緒なら、第07アンノウンエリアを調査できるはずだ。",
+];
+
+const mission2Lines = [
+  "持ち帰ったデータを解析した。だが、奇妙なことが分かった。",
+  "あのパワモンの記憶は、ひとつの世界ではなく『誰かの夢』につながっている。",
+  "ゲートのさらに奥に、3つの記憶反応が出現した。",
+  "MISSION 02を開始する。夢界深層から、記憶片を回収してくれ。",
 ];
 
 const labBlocked = new Set([
@@ -66,6 +73,7 @@ export default function Home() {
   const [position, setPosition] = useState<Position>({ x: 4, y: 6 });
   const [story, setStory] = useState(0);
   const [captured, setCaptured] = useState(false);
+  const [fragments, setFragments] = useState<number[]>([]);
   const [saveExists, setSaveExists] = useState(false);
   const [introIndex, setIntroIndex] = useState(0);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -77,13 +85,14 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (story === 0) return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured } satisfies SaveData));
-  }, [story, captured]);
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments } satisfies SaveData));
+  }, [story, captured, fragments]);
 
   const startNew = () => {
     window.localStorage.removeItem(SAVE_KEY);
     setStory(0);
     setCaptured(false);
+    setFragments([]);
     setIntroIndex(0);
     setScene("intro");
   };
@@ -93,10 +102,11 @@ export default function Home() {
     if (!saved) return startNew();
     setStory(saved.story);
     setCaptured(saved.captured);
+    setFragments(saved.fragments ?? []);
     setMapId("lab");
     setPosition({ x: 4, y: 6 });
-    setToast(saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
-    setScene(saved.captured ? "result" : "map");
+    setToast(saved.story >= 5 ? "MISSION 02：ゲートから夢界深層へ向かおう" : saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
+    setScene(saved.story >= 7 ? "result2" : saved.captured && saved.story === 4 ? "result" : "map");
   };
 
   const advanceIntro = () => {
@@ -118,15 +128,24 @@ export default function Home() {
       setStory((value) => Math.max(value, 2));
       setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
     }
+    if (dialog.complete === "mission2") {
+      setStory(5);
+      setToast("MISSION 02 START — 右上のゲートから夢界深層へ向かおう");
+    }
     setDialog(null);
   }, [dialog]);
 
   const enterUnknown = useCallback(() => {
-    setMapId("unknown");
+    const nextMap = story >= 5 ? "dream" : "unknown";
+    setMapId(nextMap);
     setPosition({ x: 1, y: 6 });
-    setStory((value) => Math.max(value, 3));
-    setToast("第07アンノウンエリア：消失街区を調査せよ");
-  }, []);
+    if (nextMap === "unknown") {
+      setStory((value) => Math.max(value, 3));
+      setToast("第07アンノウンエリア：消失街区を調査せよ");
+    } else {
+      setToast(`夢界深層：記憶片を回収せよ（${fragments.length}/3）`);
+    }
+  }, [fragments.length, story]);
 
   const enterLab = useCallback(() => {
     setMapId("lab");
@@ -139,8 +158,9 @@ export default function Home() {
     const key = `${x},${y}`;
     if (mapId === "lab") return labBlocked.has(key);
     if (unknownBlocked.has(key)) return true;
-    return !captured && x === 7 && y === 2;
-  }, [mapId, captured]);
+    if (mapId === "unknown") return !captured && x === 7 && y === 2;
+    return fragments.length === 3 && x === 7 && y === 2;
+  }, [mapId, captured, fragments.length]);
 
   const move = useCallback((dx: number, dy: number) => {
     if (scene !== "map" || dialog) return;
@@ -153,7 +173,7 @@ export default function Home() {
       enterUnknown();
       return;
     }
-    if (mapId === "unknown" && next.x === 1 && next.y === 6) {
+    if (mapId !== "lab" && next.x === 1 && next.y === 6) {
       enterLab();
       return;
     }
@@ -180,7 +200,9 @@ export default function Home() {
     const near = (x: number, y: number) => Math.abs(position.x - x) + Math.abs(position.y - y) <= 1;
     if (mapId === "lab" && near(5, 4)) {
       if (story < 2) setDialog({ lines: professorLines, index: 0, complete: "partner" });
-      else setDialog({ lines: [captured ? "信じられないデータだ。あの空間は、消えた世界の記憶なのかもしれない。" : "第07エリアでは、こちらの常識を信じすぎないことだ。"], index: 0, complete: "none" });
+      else if (story === 4) setDialog({ lines: mission2Lines, index: 0, complete: "mission2" });
+      else if (story >= 7) setDialog({ lines: ["3つの記憶片は、すべて同じ夢につながっていた。", "次は夢の主を探す。だが今は、よく戻ってきてくれた。"], index: 0, complete: "none" });
+      else setDialog({ lines: [captured ? "夢界深層では、光る記憶片を3つ集めるんだ。" : "第07エリアでは、こちらの常識を信じすぎないことだ。"], index: 0, complete: "none" });
       return;
     }
     if (mapId === "unknown" && near(7, 2) && !captured) {
@@ -190,6 +212,29 @@ export default function Home() {
     if (mapId === "unknown" && near(3, 4)) {
       setDialog({ lines: ["壊れた標識に『ここは、まだ夢の中』と刻まれている。", "文字に触れると、知らない誰かの記憶が一瞬だけ流れ込んできた。"], index: 0, complete: "none" });
       return;
+    }
+    if (mapId === "dream") {
+      const fragmentPoints = [
+        { id: 1, x: 3, y: 2, text: "誰もいない町で、パワモンと遊ぶ記憶が流れ込んできた。" },
+        { id: 2, x: 5, y: 5, text: "研究施設と同じマークが、空いっぱいに浮かんでいる。" },
+        { id: 3, x: 7, y: 4, text: "『まだ起こさないで』という声が、深層から聞こえた。" },
+      ];
+      const target = fragmentPoints.find((point) => !fragments.includes(point.id) && near(point.x, point.y));
+      if (target) {
+        const nextFragments = [...fragments, target.id];
+        setFragments(nextFragments);
+        setToast(`記憶片を回収した（${nextFragments.length}/3）`);
+        setDialog({
+          lines: nextFragments.length === 3 ? [target.text, "3つの記憶が重なり、強大な敵性反応が出現した！"] : [target.text],
+          index: 0,
+          complete: "none",
+        });
+        return;
+      }
+      if (fragments.length === 3 && near(7, 2)) {
+        setScene("battle2");
+        return;
+      }
     }
     setToast("近くに調べられるものはないようだ");
   };
@@ -207,7 +252,7 @@ export default function Home() {
             <Button className="primary-game-button" size="lg" onClick={startNew}><Zap /> はじめから</Button>
             {saveExists && <Button className="secondary-game-button" size="lg" onClick={continueGame}><RotateCcw /> つづきから</Button>}
           </div>
-          <p className="prototype-label">PROTOTYPE / MISSION 01</p>
+          <p className="prototype-label">PROTOTYPE / MISSION 01—02</p>
         </section>
       </main>
     );
@@ -228,7 +273,11 @@ export default function Home() {
   }
 
   if (scene === "battle") {
-    return <Battle onVictory={() => { setCaptured(true); setStory(4); setScene("result"); }} />;
+    return <Battle mode="normal" onVictory={() => { setCaptured(true); setStory(4); setScene("result"); }} />;
+  }
+
+  if (scene === "battle2") {
+    return <Battle mode="boss" onVictory={() => { setStory(7); setScene("result2"); }} />;
   }
 
   if (scene === "result") {
@@ -249,17 +298,43 @@ export default function Home() {
     );
   }
 
+  if (scene === "result2") {
+    return (
+      <main className="game-shell result-screen result-two">
+        <div className="result-orbit" aria-hidden="true" />
+        <section className="result-card">
+          <p className="eyebrow">MISSION 02 COMPLETE</p>
+          <div className="overdrive-result"><CharacterArtwork side="enemy" variant="result" /></div>
+          <h1>夢界深層を安定化</h1>
+          <div className="file-number">MEMORY FRAGMENTS 3 / 3</div>
+          <p>3つの記憶片は、消えた世界ではなく、ひとりの巨大なパワモンが見ている夢につながっていた。</p>
+          <div className="mystery-note"><Search /> 新たな反応：夢のさらに奥で、別の誰かがこちらを見ている。</div>
+          <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 02 COMPLETE — 主任研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
+          <Button className="text-button" variant="ghost" onClick={() => setScene("title")}>タイトルへ</Button>
+        </section>
+      </main>
+    );
+  }
+
+  const isMission2 = story >= 5;
+  const areaName = mapId === "lab" ? "パワモン研究施設" : mapId === "dream" ? "夢界深層：反転街区" : "第07アンノウンエリア";
+  const objective = story >= 7
+    ? "主任研究員に深層の調査結果を報告する"
+    : isMission2
+      ? mapId === "lab" ? "調査ゲートから夢界深層へ向かう" : fragments.length < 3 ? `記憶片を回収する（${fragments.length}/3）` : "出現したオーバードライブ個体を倒す"
+      : captured ? "研究員に調査結果を報告する" : story < 2 ? "主任研究員に話しかける" : mapId === "lab" ? "調査ゲートに入る" : "未知の反応を調査する";
+
   return (
     <main className={`game-shell map-screen ${mapId}`}>
       <header className="game-hud">
-        <div><span className="hud-kicker">CURRENT AREA</span><strong>{mapId === "lab" ? "パワモン研究施設" : "第07アンノウンエリア"}</strong></div>
-        <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : "UNSTABLE"}</div>
+        <div><span className="hud-kicker">CURRENT AREA</span><strong>{areaName}</strong></div>
+        <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
       </header>
       <section className="mission-strip">
-        <span>MISSION 01</span>
-        <p>{captured ? "研究員に調査結果を報告する" : story < 2 ? "主任研究員に話しかける" : mapId === "lab" ? "調査ゲートに入る" : "未知の反応を調査する"}</p>
+        <span>MISSION {isMission2 ? "02" : "01"}</span>
+        <p>{objective}</p>
       </section>
-      <GameMap mapId={mapId} position={position} captured={captured} />
+      <GameMap mapId={mapId} position={position} captured={captured} fragments={fragments} />
       <div className="map-toast" aria-live="polite">{toast}</div>
       <section className="mobile-controls" aria-label="移動操作">
         <div className="dpad">
@@ -281,7 +356,7 @@ export default function Home() {
   );
 }
 
-function GameMap({ mapId, position, captured }: { mapId: MapId; position: Position; captured: boolean }) {
+function GameMap({ mapId, position, captured, fragments }: { mapId: MapId; position: Position; captured: boolean; fragments: number[] }) {
   const tiles = useMemo(() => Array.from({ length: GRID_W * GRID_H }, (_, index) => index), []);
   return (
     <div className="map-frame">
@@ -294,11 +369,19 @@ function GameMap({ mapId, position, captured }: { mapId: MapId; position: Positi
             <MapObject x={1} y={1} className="lab-console wide" label="解析装置"><span /></MapObject>
             <MapObject x={7} y={5} className="lab-console" label="保管装置"><span /></MapObject>
           </>
-        ) : (
+        ) : mapId === "unknown" ? (
           <>
             <MapObject x={1} y={6} className="return-gate" label="帰還ゲート"><span className="gate-ring" /></MapObject>
             <MapObject x={3} y={4} className="memory-sign" label="壊れた標識">?</MapObject>
             {!captured && <MapObject x={7} y={2} className="wild-signal" label="未知の反応"><CharacterArtwork side="enemy" variant="map" /></MapObject>}
+          </>
+        ) : (
+          <>
+            <MapObject x={1} y={6} className="return-gate" label="帰還ゲート"><span className="gate-ring" /></MapObject>
+            {!fragments.includes(1) && <MapObject x={3} y={2} className="memory-fragment" label="記憶片1"><Sparkles /></MapObject>}
+            {!fragments.includes(2) && <MapObject x={5} y={5} className="memory-fragment" label="記憶片2"><Sparkles /></MapObject>}
+            {!fragments.includes(3) && <MapObject x={7} y={4} className="memory-fragment" label="記憶片3"><Sparkles /></MapObject>}
+            {fragments.length === 3 && <MapObject x={7} y={2} className="wild-signal boss-signal" label="オーバードライブ個体"><CharacterArtwork side="enemy" variant="map" /></MapObject>}
           </>
         )}
         <MapObject x={position.x} y={position.y} className="player" label="主人公"><span className="player-arrow" /></MapObject>
@@ -330,19 +413,23 @@ function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"
 type Intent = "charge" | "attack" | "guard";
 type MoveId = "rush" | "break" | "counter" | "link";
 
-function Battle({ onVictory }: { onVictory: () => void }) {
-  const [playerHp, setPlayerHp] = useState(36);
-  const [enemyHp, setEnemyHp] = useState(42);
+function Battle({ onVictory, mode }: { onVictory: () => void; mode: "normal" | "boss" }) {
+  const isBoss = mode === "boss";
+  const playerMaxHp = isBoss ? 42 : 36;
+  const enemyMaxHp = isBoss ? 66 : 42;
+  const [playerHp, setPlayerHp] = useState(playerMaxHp);
+  const [enemyHp, setEnemyHp] = useState(enemyMaxHp);
   const [power, setPower] = useState(0);
   const [turn, setTurn] = useState(0);
   const [locked, setLocked] = useState(false);
   const [won, setWon] = useState(false);
   const [message, setMessage] = useState("敵の構えを読んで、技を選べ！");
-  const intent: Intent = (["charge", "attack", "guard"] as Intent[])[turn % 3];
+  const intentSequence: Intent[] = isBoss ? ["attack", "charge", "attack", "guard"] : ["charge", "attack", "guard"];
+  const intent: Intent = intentSequence[turn % intentSequence.length];
   const intentLabel = { charge: "パワーをためている", attack: "強攻撃の構え", guard: "防御の構え" }[intent];
 
   const resetBattle = () => {
-    setPlayerHp(36); setEnemyHp(42); setPower(0); setTurn(0); setLocked(false); setWon(false); setMessage("敵の構えを読んで、技を選べ！");
+    setPlayerHp(playerMaxHp); setEnemyHp(enemyMaxHp); setPower(0); setTurn(0); setLocked(false); setWon(false); setMessage("敵の構えを読んで、技を選べ！");
   };
 
   const performMove = (move: MoveId) => {
@@ -372,13 +459,13 @@ function Battle({ onVictory }: { onVictory: () => void }) {
     if (move === "link") {
       damage = 22; nextPower = 0; actionText = "POWER LINK！ シグナル・オーバーレイ！";
     }
-    if (intent === "attack") playerDamage = move === "counter" ? 2 : 10;
+    if (intent === "attack") playerDamage = move === "counter" ? 2 : isBoss ? 13 : 10;
     if (intent === "charge" && move !== "rush") actionText += " 敵の力が増幅していく…";
     const nextEnemyHp = Math.max(0, enemyHp - damage);
     const nextPlayerHp = Math.max(0, playerHp - playerDamage);
     setMessage(actionText); setEnemyHp(nextEnemyHp); setPlayerHp(nextPlayerHp); setPower(nextPower);
     window.setTimeout(() => {
-      if (nextEnemyHp === 0) { setWon(true); setMessage("未知のパワモンからリンク信号を検出！"); }
+      if (nextEnemyHp === 0) { setWon(true); setMessage(isBoss ? "オーバードライブ停止！ 深層コアを安定化できる！" : "未知のパワモンからリンク信号を検出！"); }
       else if (nextPlayerHp === 0) setMessage("リンクが途切れた……再接続しよう");
       else setTurn((value) => value + 1);
       setLocked(false);
@@ -386,10 +473,10 @@ function Battle({ onVictory }: { onVictory: () => void }) {
   };
 
   return (
-    <main className="game-shell battle-screen">
+    <main className={`game-shell battle-screen ${isBoss ? "boss-battle" : ""}`}>
       <div className="battle-noise" />
       <header className="battle-header">
-        <div><span>ENCOUNTER</span><strong>UNKNOWN SIGNAL</strong></div>
+        <div><span>{isBoss ? "BOSS ENCOUNTER" : "ENCOUNTER"}</span><strong>{isBoss ? "OVERDRIVE SIGNAL" : "UNKNOWN SIGNAL"}</strong></div>
         <div className={`intent-badge ${intent}`}>
           {intent === "attack" ? <Swords /> : intent === "guard" ? <Shield /> : <Zap />}
           <span>NEXT<strong>{intentLabel}</strong></span>
@@ -397,12 +484,12 @@ function Battle({ onVictory }: { onVictory: () => void }) {
       </header>
       <section className="battle-field">
         <div className="enemy-unit">
-          <div className="unit-info enemy-info"><span>未確認個体</span><strong>UNKNOWN</strong><HpBar value={enemyHp} max={42} /></div>
+          <div className="unit-info enemy-info"><span>{isBoss ? "夢界深層・敵性反応" : "未確認個体"}</span><strong>{isBoss ? "OVERDRIVE" : "UNKNOWN"}</strong><HpBar value={enemyHp} max={enemyMaxHp} /></div>
           <CharacterArtwork side="enemy" />
         </div>
         <div className="player-unit">
           <CharacterArtwork side="ally" />
-          <div className="unit-info player-info"><span>リンク個体</span><strong>シグナル01</strong><HpBar value={playerHp} max={36} /></div>
+          <div className="unit-info player-info"><span>リンク個体</span><strong>シグナル01</strong><HpBar value={playerHp} max={playerMaxHp} /></div>
         </div>
       </section>
       <section className="battle-console">
@@ -411,7 +498,7 @@ function Battle({ onVictory }: { onVictory: () => void }) {
         {playerHp === 0 ? (
           <Button className="primary-game-button battle-retry" onClick={resetBattle}><RotateCcw /> 再接続する</Button>
         ) : won ? (
-          <Button className="link-button" onClick={onVictory}><Radio /> パワーリンクする</Button>
+          <Button className="link-button" onClick={onVictory}><Radio /> {isBoss ? "深層コアを安定させる" : "パワーリンクする"}</Button>
         ) : (
           <div className="move-grid">
             <Button disabled={locked} onClick={() => performMove("rush")} className="move-button rush-move"><Zap /><span><strong>ラッシュ</strong><small>ためを妨害・POWER +1</small></span></Button>
