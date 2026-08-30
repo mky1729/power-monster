@@ -6,9 +6,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Boxes,
   FlaskConical,
   Radio,
   RotateCcw,
+  Save,
   Search,
   Shield,
   Sparkles,
@@ -16,12 +18,14 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Scene = "title" | "intro" | "map" | "battle" | "battle2" | "result" | "result2";
 type MapId = "lab" | "unknown" | "dream";
 type Position = { x: number; y: number };
-type Dialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
-type SaveData = { story: number; captured: boolean; fragments?: number[] };
+type GameDialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
+type PowmonId = "ally-001" | "enemy-001" | "enemy-overdrive";
+type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[] };
 
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
@@ -74,9 +78,11 @@ export default function Home() {
   const [story, setStory] = useState(0);
   const [captured, setCaptured] = useState(false);
   const [fragments, setFragments] = useState<number[]>([]);
+  const [collection, setCollection] = useState<PowmonId[]>([]);
+  const [boxOpen, setBoxOpen] = useState(false);
   const [saveExists, setSaveExists] = useState(false);
   const [introIndex, setIntroIndex] = useState(0);
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [dialog, setDialog] = useState<GameDialog | null>(null);
   const [toast, setToast] = useState("マップを移動して、研究員に話しかけよう");
 
   useEffect(() => {
@@ -85,14 +91,15 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (story === 0) return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments } satisfies SaveData));
-  }, [story, captured, fragments]);
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection } satisfies SaveData));
+  }, [story, captured, fragments, collection]);
 
   const startNew = () => {
     window.localStorage.removeItem(SAVE_KEY);
     setStory(0);
     setCaptured(false);
     setFragments([]);
+    setCollection([]);
     setIntroIndex(0);
     setScene("intro");
   };
@@ -103,6 +110,12 @@ export default function Home() {
     setStory(saved.story);
     setCaptured(saved.captured);
     setFragments(saved.fragments ?? []);
+    const legacyCollection: PowmonId[] = saved.collection ?? [
+      ...(saved.story >= 2 ? ["ally-001" as const] : []),
+      ...(saved.captured ? ["enemy-001" as const] : []),
+      ...(saved.story >= 7 ? ["enemy-overdrive" as const] : []),
+    ];
+    setCollection(legacyCollection);
     setMapId("lab");
     setPosition({ x: 4, y: 6 });
     setToast(saved.story >= 5 ? "MISSION 02：ゲートから夢界深層へ向かおう" : saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
@@ -126,6 +139,7 @@ export default function Home() {
     }
     if (dialog.complete === "partner") {
       setStory((value) => Math.max(value, 2));
+      setCollection((value) => value.includes("ally-001") ? value : [...value, "ally-001"]);
       setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
     }
     if (dialog.complete === "mission2") {
@@ -134,6 +148,15 @@ export default function Home() {
     }
     setDialog(null);
   }, [dialog]);
+
+  const saveNow = () => {
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection } satisfies SaveData));
+    setToast("この端末にセーブしました ✓");
+  };
+
+  const catchPowmon = (id: PowmonId) => {
+    setCollection((value) => value.includes(id) ? value : [...value, id]);
+  };
 
   const enterUnknown = useCallback(() => {
     const nextMap = story >= 5 ? "dream" : "unknown";
@@ -253,6 +276,7 @@ export default function Home() {
             {saveExists && <Button className="secondary-game-button" size="lg" onClick={continueGame}><RotateCcw /> つづきから</Button>}
           </div>
           <p className="prototype-label">PROTOTYPE / MISSION 01—02</p>
+          <p className="title-save-note"><Save /> 進行はこの端末に自動保存されます</p>
         </section>
       </main>
     );
@@ -273,11 +297,11 @@ export default function Home() {
   }
 
   if (scene === "battle") {
-    return <Battle mode="normal" onVictory={() => { setCaptured(true); setStory(4); setScene("result"); }} />;
+    return <Battle mode="normal" onVictory={() => { catchPowmon("enemy-001"); setCaptured(true); setStory(4); setScene("result"); }} />;
   }
 
   if (scene === "battle2") {
-    return <Battle mode="boss" onVictory={() => { setStory(7); setScene("result2"); }} />;
+    return <Battle mode="boss" onVictory={() => { catchPowmon("enemy-overdrive"); setStory(7); setScene("result2"); }} />;
   }
 
   if (scene === "result") {
@@ -285,10 +309,10 @@ export default function Home() {
       <main className="game-shell result-screen">
         <div className="result-orbit" aria-hidden="true" />
         <section className="result-card">
-          <p className="eyebrow">LINK COMPLETE</p>
+          <p className="eyebrow">CAPTURE COMPLETE</p>
           <CharacterArtwork side="enemy" variant="result" />
-          <h1>未確認パワモンを記録</h1>
-          <div className="file-number">FILE No. 001</div>
+          <h1>敵パワモンを捕まえた！</h1>
+          <div className="file-number">POWERMON BOX 2 / 3</div>
           <p>消えた街の記憶を持つパワモン。眠っている間、知らない世界の言葉を話す。</p>
           <div className="mystery-note"><Search /> 新たな疑問：これは世界の記憶か、それとも誰かの夢なのか？</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 01 COMPLETE — 研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -305,8 +329,8 @@ export default function Home() {
         <section className="result-card">
           <p className="eyebrow">MISSION 02 COMPLETE</p>
           <div className="overdrive-result"><CharacterArtwork side="enemy" variant="result" /></div>
-          <h1>夢界深層を安定化</h1>
-          <div className="file-number">MEMORY FRAGMENTS 3 / 3</div>
+          <h1>オーバードライブ個体を捕まえた！</h1>
+          <div className="file-number">POWERMON BOX 3 / 3</div>
           <p>3つの記憶片は、消えた世界ではなく、ひとりの巨大なパワモンが見ている夢につながっていた。</p>
           <div className="mystery-note"><Search /> 新たな反応：夢のさらに奥で、別の誰かがこちらを見ている。</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 02 COMPLETE — 主任研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -328,7 +352,11 @@ export default function Home() {
     <main className={`game-shell map-screen ${mapId}`}>
       <header className="game-hud">
         <div><span className="hud-kicker">CURRENT AREA</span><strong>{areaName}</strong></div>
-        <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
+        <div className="hud-actions">
+          <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
+          <Button className="hud-icon-button" aria-label="パワモンBOXを開く" onClick={() => setBoxOpen(true)}><Boxes /></Button>
+          <Button className="hud-icon-button" aria-label="セーブする" onClick={saveNow}><Save /></Button>
+        </div>
       </header>
       <section className="mission-strip">
         <span>MISSION {isMission2 ? "02" : "01"}</span>
@@ -352,6 +380,7 @@ export default function Home() {
           <p>{dialog.lines[dialog.index]}</p><ChevronDown />
         </button>
       )}
+      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} />
     </main>
   );
 }
@@ -394,7 +423,7 @@ function MapObject({ x, y, className, label, children }: { x: number; y: number;
   return <div className={`map-object ${className}`} style={{ left: `${x * 10}%`, top: `${y * 12.5}%` }} aria-label={label}>{children}</div>;
 }
 
-function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"; variant?: "battle" | "map" | "result" }) {
+function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"; variant?: "battle" | "map" | "result" | "box" }) {
   return (
     <div className={`character-art ${side} ${variant}`}>
       {/* User-provided artwork is served from the project repository. */}
@@ -407,6 +436,36 @@ function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"
       <span className="scan-corner corner-one" />
       <span className="scan-corner corner-two" />
     </div>
+  );
+}
+
+function PowmonBox({ open, onOpenChange, collection }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[] }) {
+  const entries: Array<{ id: PowmonId; side: "ally" | "enemy"; name: string; note: string }> = [
+    { id: "ally-001", side: "ally", name: "シグナル01", note: "最初にリンクした相棒" },
+    { id: "enemy-001", side: "enemy", name: "敵パワモン No.001", note: "消失街区で捕獲" },
+    { id: "enemy-overdrive", side: "enemy", name: "OVERDRIVE個体", note: "夢界深層で捕獲" },
+  ];
+  const caughtEntries = entries.filter((entry) => collection.includes(entry.id));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="powmon-box-dialog">
+        <DialogHeader>
+          <DialogTitle>パワモンBOX</DialogTitle>
+          <DialogDescription>捕まえたパワモン：{caughtEntries.length}体 ／ この端末に自動保存</DialogDescription>
+        </DialogHeader>
+        <div className="powmon-box-grid">
+          {caughtEntries.map((entry) => (
+            <article key={entry.id} className={`powmon-box-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""}`}>
+              <CharacterArtwork side={entry.side} variant="box" />
+              <div><strong>{entry.name}</strong><span>{entry.note}</span></div>
+            </article>
+          ))}
+          {caughtEntries.length === 0 && <p className="box-empty">まだ捕まえたパワモンはいません。</p>}
+        </div>
+        <p className="box-save-help"><Save /> セーブはこのブラウザ内に保存されます。別の端末には自動で移りません。</p>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -498,7 +557,7 @@ function Battle({ onVictory, mode }: { onVictory: () => void; mode: "normal" | "
         {playerHp === 0 ? (
           <Button className="primary-game-button battle-retry" onClick={resetBattle}><RotateCcw /> 再接続する</Button>
         ) : won ? (
-          <Button className="link-button" onClick={onVictory}><Radio /> {isBoss ? "深層コアを安定させる" : "パワーリンクする"}</Button>
+          <Button className="link-button capture-button" onClick={onVictory}><Radio /> {isBoss ? "安定させて捕まえる" : "リンクして捕まえる"}</Button>
         ) : (
           <div className="move-grid">
             <Button disabled={locked} onClick={() => performMove("rush")} className="move-button rush-move"><Zap /><span><strong>ラッシュ</strong><small>ためを妨害・POWER +1</small></span></Button>
