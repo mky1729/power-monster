@@ -15,6 +15,7 @@ import {
   Shield,
   Sparkles,
   Swords,
+  UsersRound,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ type MapId = "lab" | "unknown" | "dream";
 type Position = { x: number; y: number };
 type GameDialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
 type PowmonId = "ally-001" | "enemy-001" | "enemy-overdrive";
-type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[] };
+type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[]; party?: PowmonId[] };
 
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
@@ -79,6 +80,7 @@ export default function Home() {
   const [captured, setCaptured] = useState(false);
   const [fragments, setFragments] = useState<number[]>([]);
   const [collection, setCollection] = useState<PowmonId[]>([]);
+  const [party, setParty] = useState<PowmonId[]>([]);
   const [boxOpen, setBoxOpen] = useState(false);
   const [saveExists, setSaveExists] = useState(false);
   const [introIndex, setIntroIndex] = useState(0);
@@ -91,8 +93,8 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (story === 0) return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection } satisfies SaveData));
-  }, [story, captured, fragments, collection]);
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party } satisfies SaveData));
+  }, [story, captured, fragments, collection, party]);
 
   const startNew = () => {
     window.localStorage.removeItem(SAVE_KEY);
@@ -100,6 +102,7 @@ export default function Home() {
     setCaptured(false);
     setFragments([]);
     setCollection([]);
+    setParty([]);
     setIntroIndex(0);
     setScene("intro");
   };
@@ -116,6 +119,7 @@ export default function Home() {
       ...(saved.story >= 7 ? ["enemy-overdrive" as const] : []),
     ];
     setCollection(legacyCollection);
+    setParty(saved.party ?? legacyCollection.slice(0, 6));
     setMapId("lab");
     setPosition({ x: 4, y: 6 });
     setToast(saved.story >= 5 ? "MISSION 02：ゲートから夢界深層へ向かおう" : saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
@@ -140,6 +144,7 @@ export default function Home() {
     if (dialog.complete === "partner") {
       setStory((value) => Math.max(value, 2));
       setCollection((value) => value.includes("ally-001") ? value : [...value, "ally-001"]);
+      setParty((value) => value.includes("ally-001") ? value : [...value, "ally-001"].slice(0, 6));
       setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
     }
     if (dialog.complete === "mission2") {
@@ -150,12 +155,13 @@ export default function Home() {
   }, [dialog]);
 
   const saveNow = () => {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection } satisfies SaveData));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party } satisfies SaveData));
     setToast("この端末にセーブしました ✓");
   };
 
   const catchPowmon = (id: PowmonId) => {
     setCollection((value) => value.includes(id) ? value : [...value, id]);
+    setParty((value) => value.includes(id) || value.length >= 6 ? value : [...value, id]);
   };
 
   const enterUnknown = useCallback(() => {
@@ -312,7 +318,7 @@ export default function Home() {
           <p className="eyebrow">CAPTURE COMPLETE</p>
           <CharacterArtwork side="enemy" variant="result" />
           <h1>敵パワモンを捕まえた！</h1>
-          <div className="file-number">POWERMON BOX 2 / 3</div>
+          <div className="file-number"><UsersRound /> 手持ちに加わった！</div>
           <p>消えた街の記憶を持つパワモン。眠っている間、知らない世界の言葉を話す。</p>
           <div className="mystery-note"><Search /> 新たな疑問：これは世界の記憶か、それとも誰かの夢なのか？</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 01 COMPLETE — 研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -330,7 +336,7 @@ export default function Home() {
           <p className="eyebrow">MISSION 02 COMPLETE</p>
           <div className="overdrive-result"><CharacterArtwork side="enemy" variant="result" /></div>
           <h1>オーバードライブ個体を捕まえた！</h1>
-          <div className="file-number">POWERMON BOX 3 / 3</div>
+          <div className="file-number"><UsersRound /> 手持ちに加わった！</div>
           <p>3つの記憶片は、消えた世界ではなく、ひとりの巨大なパワモンが見ている夢につながっていた。</p>
           <div className="mystery-note"><Search /> 新たな反応：夢のさらに奥で、別の誰かがこちらを見ている。</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 02 COMPLETE — 主任研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -354,7 +360,7 @@ export default function Home() {
         <div><span className="hud-kicker">CURRENT AREA</span><strong>{areaName}</strong></div>
         <div className="hud-actions">
           <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
-          <Button className="hud-icon-button" aria-label="パワモンBOXを開く" onClick={() => setBoxOpen(true)}><Boxes /></Button>
+          <Button className="hud-icon-button" aria-label="手持ちとパワモンBOXを開く" onClick={() => setBoxOpen(true)}><UsersRound /></Button>
           <Button className="hud-icon-button" aria-label="セーブする" onClick={saveNow}><Save /></Button>
         </div>
       </header>
@@ -380,7 +386,7 @@ export default function Home() {
           <p>{dialog.lines[dialog.index]}</p><ChevronDown />
         </button>
       )}
-      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} />
+      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} party={party} />
     </main>
   );
 }
@@ -439,29 +445,46 @@ function CharacterArtwork({ side, variant = "battle" }: { side: "ally" | "enemy"
   );
 }
 
-function PowmonBox({ open, onOpenChange, collection }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[] }) {
+function PowmonBox({ open, onOpenChange, collection, party }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[]; party: PowmonId[] }) {
   const entries: Array<{ id: PowmonId; side: "ally" | "enemy"; name: string; note: string }> = [
     { id: "ally-001", side: "ally", name: "シグナル01", note: "最初にリンクした相棒" },
     { id: "enemy-001", side: "enemy", name: "敵パワモン No.001", note: "消失街区で捕獲" },
     { id: "enemy-overdrive", side: "enemy", name: "OVERDRIVE個体", note: "夢界深層で捕獲" },
   ];
   const caughtEntries = entries.filter((entry) => collection.includes(entry.id));
+  const partyEntries = party.flatMap((id) => entries.filter((entry) => entry.id === id));
+  const boxEntries = caughtEntries.filter((entry) => !party.includes(entry.id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="powmon-box-dialog">
         <DialogHeader>
-          <DialogTitle>パワモンBOX</DialogTitle>
-          <DialogDescription>捕まえたパワモン：{caughtEntries.length}体 ／ この端末に自動保存</DialogDescription>
+          <DialogTitle>手持ち・パワモンBOX</DialogTitle>
+          <DialogDescription>捕まえると、空きがある限り手持ちへ自動で加わります。</DialogDescription>
         </DialogHeader>
+        <section className="party-section" aria-labelledby="party-title">
+          <div className="box-section-title"><span id="party-title"><UsersRound /> 手持ち</span><b>{partyEntries.length} / 6</b></div>
+          <div className="party-grid">
+            {Array.from({ length: 6 }, (_, index) => {
+              const entry = partyEntries[index];
+              return entry ? (
+                <article key={entry.id} className={`party-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""}`}>
+                  <CharacterArtwork side={entry.side} variant="box" />
+                  <strong>{entry.name}</strong>
+                </article>
+              ) : <div key={`empty-${index}`} className="party-slot-empty"><span>{index + 1}</span><small>あき</small></div>;
+            })}
+          </div>
+        </section>
+        <div className="box-section-title"><span><Boxes /> BOX</span><b>{boxEntries.length}体</b></div>
         <div className="powmon-box-grid">
-          {caughtEntries.map((entry) => (
+          {boxEntries.map((entry) => (
             <article key={entry.id} className={`powmon-box-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""}`}>
               <CharacterArtwork side={entry.side} variant="box" />
               <div><strong>{entry.name}</strong><span>{entry.note}</span></div>
             </article>
           ))}
-          {caughtEntries.length === 0 && <p className="box-empty">まだ捕まえたパワモンはいません。</p>}
+          {boxEntries.length === 0 && <p className="box-empty">手持ちに入りきらないパワモンは、ここへ送られます。</p>}
         </div>
         <p className="box-save-help"><Save /> セーブはこのブラウザ内に保存されます。別の端末には自動で移りません。</p>
       </DialogContent>

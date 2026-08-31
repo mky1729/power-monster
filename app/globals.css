@@ -592,7 +592,8 @@ button {
 .result-two .result-card { border-color: #d98cff; background: #130d20ee; }
 .overdrive-result { width: fit-content; margin: 0 auto; filter: drop-shadow(0 0 15px #ff487f); }
 .overdrive-result .character-art { border-color: #ff487f; }
-.file-number { display: inline-block; padding: 4px 9px; background: #1a3442; color: var(--cyan); font: 900 10px monospace; }
+.file-number { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; background: #1a3442; color: var(--cyan); font: 900 10px monospace; }
+.file-number svg { width: 14px; height: 14px; }
 .mystery-note { display: flex; gap: 8px; margin: 18px 0; padding: 11px; border: 1px solid #725f9e; background: #211a32; color: #d5c7ff; font-size: 11px; line-height: 1.6; text-align: left; }
 .mystery-note svg { flex: none; width: 17px; }.result-card .primary-game-button { width: 100%; }.text-button { margin-top: 7px; color: #8da4af !important; }
 
@@ -609,6 +610,20 @@ button {
 .powmon-box-dialog [data-slot="dialog-title"] { color: var(--cyan); font: 900 20px monospace; letter-spacing: 0.05em; }
 .powmon-box-dialog [data-slot="dialog-description"] { color: #8eabb8; font-size: 11px; }
 .powmon-box-dialog [data-slot="dialog-close"] { color: #c7faff; }
+.party-section { display: grid; gap: 8px; }
+.box-section-title { display: flex; align-items: center; justify-content: space-between; color: #bfeff3; font: 800 10px monospace; letter-spacing: 0.08em; }
+.box-section-title span { display: flex; align-items: center; gap: 6px; }
+.box-section-title svg { width: 14px; height: 14px; color: var(--cyan); }
+.box-section-title b { color: #7796a4; font-weight: 700; }
+.party-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.party-card,
+.party-slot-empty { display: flex; min-width: 0; height: 110px; align-items: center; justify-content: center; flex-direction: column; gap: 5px; border: 1px solid #315564; background: #0b202b; }
+.party-card strong { max-width: 100%; padding: 0 4px; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.party-card .character-art.box { width: 58px; height: 66px; }
+.party-card.overdrive-card { border-color: #9d3f6a; background: #281322; box-shadow: inset 0 3px #ff4778; }
+.party-slot-empty { border-style: dashed; background: #081219; color: #425d69; }
+.party-slot-empty span { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #2b4651; border-radius: 50%; font: 700 10px monospace; }
+.party-slot-empty small { font-size: 8px; letter-spacing: 0.12em; }
 .powmon-box-grid { display: grid; gap: 9px; }
 .powmon-box-card { display: flex; align-items: center; gap: 12px; padding: 9px; border: 1px solid #315564; background: #0b202b; }
 .powmon-box-card > div:last-child { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
