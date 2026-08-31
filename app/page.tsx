@@ -32,7 +32,7 @@ const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
 const GRID_H = 8;
 const ALLY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/ally-001.jpeg";
-const ENEMY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/enemy-001.jpeg";
+const ENEMY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/enemy-001.png";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
