@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PowerMonstar",
+  title: "PowerMonster",
   description: "未知のパワモンとリンクし、失われた世界の謎を追う冒険RPG。",
 };
 

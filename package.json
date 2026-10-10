@@ -1,5 +1,5 @@
 {
-  "name": "power-monstar",
+  "name": "power-monster",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -61,5 +61,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "PowerMonstar"
+  "displayName": "PowerMonster"
 }

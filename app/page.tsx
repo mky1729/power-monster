@@ -286,7 +286,7 @@ export default function Home() {
         <section className="title-panel" aria-labelledby="game-title">
           <div className="core-mark" aria-hidden="true"><span /></div>
           <p className="eyebrow">UNKNOWN SIGNAL DETECTED</p>
-          <h1 id="game-title">PowerMonstar</h1>
+          <h1 id="game-title">PowerMonster</h1>
           <p className="title-copy">失われた世界と、夢を見るモンスター。</p>
           <div className="title-actions">
             <Button className="primary-game-button" size="lg" onClick={startNew}><Zap /> はじめから</Button>
