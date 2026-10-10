@@ -26,7 +26,9 @@ type MapId = "lab" | "unknown" | "dream";
 type Position = { x: number; y: number };
 type GameDialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
 type PowmonId = "ally-001" | "enemy-001" | "enemy-overdrive";
-type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[]; party?: PowmonId[]; evolved?: PowmonId[] };
+type CardType = "monster" | "super";
+type CapturedCards = Partial<Record<PowmonId, CardType>>;
+type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[]; party?: PowmonId[]; evolved?: PowmonId[]; capturedCards?: CapturedCards };
 
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
@@ -35,6 +37,7 @@ const ALLY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main
 const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/ally-002.jpeg";
 const ENEMY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-001.png";
 const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-002.jpeg";
+const CARD_IMAGE_ROOT = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/cards";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
@@ -84,6 +87,7 @@ export default function Home() {
   const [collection, setCollection] = useState<PowmonId[]>([]);
   const [party, setParty] = useState<PowmonId[]>([]);
   const [evolved, setEvolved] = useState<PowmonId[]>([]);
+  const [capturedCards, setCapturedCards] = useState<CapturedCards>({});
   const [boxOpen, setBoxOpen] = useState(false);
   const [saveExists, setSaveExists] = useState(false);
   const [introIndex, setIntroIndex] = useState(0);
@@ -96,8 +100,8 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (story === 0) return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved } satisfies SaveData));
-  }, [story, captured, fragments, collection, party, evolved]);
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards } satisfies SaveData));
+  }, [story, captured, fragments, collection, party, evolved, capturedCards]);
 
   const startNew = () => {
     window.localStorage.removeItem(SAVE_KEY);
@@ -107,6 +111,7 @@ export default function Home() {
     setCollection([]);
     setParty([]);
     setEvolved([]);
+    setCapturedCards({});
     setIntroIndex(0);
     setScene("intro");
   };
@@ -125,6 +130,7 @@ export default function Home() {
     setCollection(legacyCollection);
     setParty(saved.party ?? legacyCollection.slice(0, 6));
     setEvolved(saved.evolved ?? []);
+    setCapturedCards(saved.capturedCards ?? Object.fromEntries(legacyCollection.map((id) => [id, "monster"])) as CapturedCards);
     setMapId("lab");
     setPosition({ x: 4, y: 6 });
     setToast(saved.story >= 5 ? "MISSION 02：ゲートから夢界深層へ向かおう" : saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
@@ -150,6 +156,7 @@ export default function Home() {
       setStory((value) => Math.max(value, 2));
       setCollection((value) => value.includes("ally-001") ? value : [...value, "ally-001"]);
       setParty((value) => value.includes("ally-001") ? value : [...value, "ally-001" as const].slice(0, 6));
+      setCapturedCards((value) => ({ ...value, "ally-001": value["ally-001"] ?? "monster" }));
       setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
     }
     if (dialog.complete === "mission2") {
@@ -160,13 +167,14 @@ export default function Home() {
   }, [dialog]);
 
   const saveNow = () => {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved } satisfies SaveData));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards } satisfies SaveData));
     setToast("この端末にセーブしました ✓");
   };
 
-  const catchPowmon = (id: PowmonId) => {
+  const catchPowmon = (id: PowmonId, card: CardType) => {
     setCollection((value) => value.includes(id) ? value : [...value, id]);
     setParty((value) => value.includes(id) || value.length >= 6 ? value : [...value, id]);
+    setCapturedCards((value) => ({ ...value, [id]: card }));
   };
 
   const evolvePowmon = (id: PowmonId) => {
@@ -314,11 +322,11 @@ export default function Home() {
   }
 
   if (scene === "battle") {
-    return <Battle mode="normal" allyEvolved={evolved.includes("ally-001")} onVictory={() => { catchPowmon("enemy-001"); setCaptured(true); setStory(4); setScene("result"); }} />;
+    return <Battle mode="normal" allyEvolved={evolved.includes("ally-001")} onVictory={(card) => { catchPowmon("enemy-001", card); setCaptured(true); setStory(4); setScene("result"); }} />;
   }
 
   if (scene === "battle2") {
-    return <Battle mode="boss" allyEvolved={evolved.includes("ally-001")} onVictory={() => { catchPowmon("enemy-overdrive"); setStory(7); setScene("result2"); }} />;
+    return <Battle mode="boss" allyEvolved={evolved.includes("ally-001")} onVictory={(card) => { catchPowmon("enemy-overdrive", card); setStory(7); setScene("result2"); }} />;
   }
 
   if (scene === "result") {
@@ -327,9 +335,9 @@ export default function Home() {
         <div className="result-orbit" aria-hidden="true" />
         <section className="result-card">
           <p className="eyebrow">CAPTURE COMPLETE</p>
-          <CharacterArtwork side="enemy" variant="result" />
+          <CardArtwork id="enemy-001" card={capturedCards["enemy-001"] ?? "monster"} className="result-capture-card" />
           <h1>敵パワモンを捕まえた！</h1>
-          <div className="file-number"><UsersRound /> 手持ちに加わった！</div>
+          <div className="file-number"><UsersRound /> {capturedCards["enemy-001"] === "super" ? "スーパーカード" : "モンスターカード"}で手持ちに加わった！</div>
           <p>消えた街の記憶を持つパワモン。眠っている間、知らない世界の言葉を話す。</p>
           <div className="mystery-note"><Search /> 新たな疑問：これは世界の記憶か、それとも誰かの夢なのか？</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 01 COMPLETE — 研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -345,9 +353,9 @@ export default function Home() {
         <div className="result-orbit" aria-hidden="true" />
         <section className="result-card">
           <p className="eyebrow">MISSION 02 COMPLETE</p>
-          <div className="overdrive-result"><CharacterArtwork side="enemy" variant="result" evolved /></div>
+          <div className="overdrive-result"><CardArtwork id="enemy-overdrive" card={capturedCards["enemy-overdrive"] ?? "monster"} evolved className="result-capture-card" /></div>
           <h1>オーバードライブ個体を捕まえた！</h1>
-          <div className="file-number"><UsersRound /> 手持ちに加わった！</div>
+          <div className="file-number"><UsersRound /> {capturedCards["enemy-overdrive"] === "super" ? "スーパーカード" : "モンスターカード"}で手持ちに加わった！</div>
           <p>3つの記憶片は、消えた世界ではなく、ひとりの巨大なパワモンが見ている夢につながっていた。</p>
           <div className="mystery-note"><Search /> 新たな反応：夢のさらに奥で、別の誰かがこちらを見ている。</div>
           <Button className="primary-game-button" size="lg" onClick={() => { setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("MISSION 02 COMPLETE — 主任研究員に報告しよう"); setScene("map"); }}>研究施設へ戻る</Button>
@@ -397,7 +405,7 @@ export default function Home() {
           <p>{dialog.lines[dialog.index]}</p><ChevronDown />
         </button>
       )}
-      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} party={party} evolved={evolved} onEvolve={evolvePowmon} />
+      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} party={party} evolved={evolved} capturedCards={capturedCards} onEvolve={evolvePowmon} />
     </main>
   );
 }
@@ -459,7 +467,24 @@ function CharacterArtwork({ side, variant = "battle", evolved = false }: { side:
   );
 }
 
-function PowmonBox({ open, onOpenChange, collection, party, evolved, onEvolve }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[]; party: PowmonId[]; evolved: PowmonId[]; onEvolve: (id: PowmonId) => void }) {
+function cardImageFor(id: PowmonId, card: CardType, evolved = false) {
+  if (id === "ally-001") return `${CARD_IMAGE_ROOT}/monster_card_${evolved ? "raihou" : "raiden"}.jpg`;
+  const monsterName = id === "enemy-overdrive" || evolved ? "deruberos" : "houwan";
+  return `${CARD_IMAGE_ROOT}/${card}_card_${monsterName}.jpg`;
+}
+
+function CardArtwork({ id, card, evolved = false, className = "" }: { id: PowmonId; card: CardType; evolved?: boolean; className?: string }) {
+  const cardName = card === "super" ? "スーパーカード" : "モンスターカード";
+  return (
+    <div className={`powmon-card-art ${card} ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={cardImageFor(id, card, evolved)} alt={`${cardName}に入ったパワモン`} draggable={false} />
+      <span>{cardName}</span>
+    </div>
+  );
+}
+
+function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCards, onEvolve }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[]; party: PowmonId[]; evolved: PowmonId[]; capturedCards: CapturedCards; onEvolve: (id: PowmonId) => void }) {
   const entries: Array<{ id: PowmonId; side: "ally" | "enemy"; name: string; note: string }> = [
     { id: "ally-001", side: "ally", name: "シグナル01", note: "最初にリンクした相棒" },
     { id: "enemy-001", side: "enemy", name: "敵パワモン No.001", note: "消失街区で捕獲" },
@@ -474,7 +499,7 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, onEvolve }:
       <DialogContent className="powmon-box-dialog">
         <DialogHeader>
           <DialogTitle>手持ち・パワモンBOX</DialogTitle>
-          <DialogDescription>捕まえると、空きがある限り手持ちへ自動で加わります。</DialogDescription>
+          <DialogDescription>捕まえたパワモンは、選んだカードに入って手持ちへ加わります。</DialogDescription>
         </DialogHeader>
         <section className="party-section" aria-labelledby="party-title">
           <div className="box-section-title"><span id="party-title"><UsersRound /> 手持ち</span><b>{partyEntries.length} / 6</b></div>
@@ -485,7 +510,7 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, onEvolve }:
               const canEvolve = entry ? entry.id !== "enemy-overdrive" && !hasEvolved : false;
               return entry ? (
                 <article key={entry.id} className={`party-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""} ${hasEvolved ? "evolved-card" : ""}`}>
-                  <CharacterArtwork side={entry.side} variant="box" evolved={hasEvolved} />
+                  <CardArtwork id={entry.id} card={capturedCards[entry.id] ?? "monster"} evolved={hasEvolved} />
                   <strong>{entry.name}{hasEvolved && entry.id !== "enemy-overdrive" ? "・進化形" : ""}</strong>
                   {canEvolve ? (
                     <Button className="evolve-button" size="sm" onClick={() => onEvolve(entry.id)}><Sparkles />進化する</Button>
@@ -499,8 +524,8 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, onEvolve }:
         <div className="powmon-box-grid">
           {boxEntries.map((entry) => (
             <article key={entry.id} className={`powmon-box-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""}`}>
-              <CharacterArtwork side={entry.side} variant="box" evolved={evolved.includes(entry.id) || entry.id === "enemy-overdrive"} />
-              <div><strong>{entry.name}{evolved.includes(entry.id) ? "・進化形" : ""}</strong><span>{entry.note}</span></div>
+              <CardArtwork id={entry.id} card={capturedCards[entry.id] ?? "monster"} evolved={evolved.includes(entry.id) || entry.id === "enemy-overdrive"} />
+              <div><strong>{entry.name}{evolved.includes(entry.id) ? "・進化形" : ""}</strong><span>{entry.note}・{capturedCards[entry.id] === "super" ? "スーパーカード" : "モンスターカード"}</span></div>
             </article>
           ))}
           {boxEntries.length === 0 && <p className="box-empty">手持ちに入りきらないパワモンは、ここへ送られます。</p>}
@@ -514,7 +539,7 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, onEvolve }:
 type Intent = "charge" | "attack" | "guard";
 type MoveId = "rush" | "break" | "counter" | "link";
 
-function Battle({ onVictory, mode, allyEvolved }: { onVictory: () => void; mode: "normal" | "boss"; allyEvolved: boolean }) {
+function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) => void; mode: "normal" | "boss"; allyEvolved: boolean }) {
   const isBoss = mode === "boss";
   const playerMaxHp = isBoss ? 42 : 36;
   const enemyMaxHp = isBoss ? 66 : 42;
@@ -524,13 +549,30 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: () => void; mode:
   const [turn, setTurn] = useState(0);
   const [locked, setLocked] = useState(false);
   const [won, setWon] = useState(false);
+  const [captureLocked, setCaptureLocked] = useState(false);
   const [message, setMessage] = useState("敵の構えを読んで、技を選べ！");
   const intentSequence: Intent[] = isBoss ? ["attack", "charge", "attack", "guard"] : ["charge", "attack", "guard"];
   const intent: Intent = intentSequence[turn % intentSequence.length];
   const intentLabel = { charge: "パワーをためている", attack: "強攻撃の構え", guard: "防御の構え" }[intent];
 
   const resetBattle = () => {
-    setPlayerHp(playerMaxHp); setEnemyHp(enemyMaxHp); setPower(0); setTurn(0); setLocked(false); setWon(false); setMessage("敵の構えを読んで、技を選べ！");
+    setPlayerHp(playerMaxHp); setEnemyHp(enemyMaxHp); setPower(0); setTurn(0); setLocked(false); setWon(false); setCaptureLocked(false); setMessage("敵の構えを読んで、技を選べ！");
+  };
+
+  const attemptCapture = (card: CardType) => {
+    if (captureLocked) return;
+    setCaptureLocked(true);
+    const chance = isBoss ? (card === "super" ? 0.75 : 0.45) : (card === "super" ? 0.9 : 0.7);
+    setMessage(`${card === "super" ? "スーパーカード" : "モンスターカード"}を展開！`);
+    window.setTimeout(() => {
+      if (Math.random() < chance) {
+        setMessage("カードリンク成功！ パワモンを捕まえた！");
+        window.setTimeout(() => onVictory(card), 650);
+      } else {
+        setMessage("カードから抜け出した！ カードを選び直そう");
+        setCaptureLocked(false);
+      }
+    }, 720);
   };
 
   const performMove = (move: MoveId) => {
@@ -599,7 +641,21 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: () => void; mode:
         {playerHp === 0 ? (
           <Button className="primary-game-button battle-retry" onClick={resetBattle}><RotateCcw /> 再接続する</Button>
         ) : won ? (
-          <Button className="link-button capture-button" onClick={onVictory}><Radio /> {isBoss ? "安定させて捕まえる" : "リンクして捕まえる"}</Button>
+          <div className="capture-panel" aria-label="捕獲カードを選ぶ">
+            <p>捕まえるカードを選ぼう</p>
+            <div className="capture-card-grid">
+              <button disabled={captureLocked} onClick={() => attemptCapture("monster")} className="capture-card-choice monster">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`${CARD_IMAGE_ROOT}/monster_card.jpg`} alt="普通のモンスターカード" />
+                <span><strong>モンスターカード</strong><small>標準の捕獲率</small></span>
+              </button>
+              <button disabled={captureLocked} onClick={() => attemptCapture("super")} className="capture-card-choice super">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`${CARD_IMAGE_ROOT}/super_card.jpg`} alt="青いスーパーカード" />
+                <span><strong>スーパーカード</strong><small>捕まえやすい</small></span>
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="move-grid">
             <Button disabled={locked} onClick={() => performMove("rush")} className="move-button rush-move"><Zap /><span><strong>ラッシュ</strong><small>ためを妨害・POWER +1</small></span></Button>
