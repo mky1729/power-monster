@@ -31,10 +31,10 @@ type SaveData = { story: number; captured: boolean; fragments?: number[]; collec
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
 const GRID_H = 8;
-const ALLY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/ally-001.jpeg";
-const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/ally-002.jpeg";
-const ENEMY_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/enemy-001.png";
-const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/MossAn-journey/power-monstar/main/public/powermon/enemy-002.jpeg";
+const ALLY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/ally-001.jpeg";
+const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/ally-002.jpeg";
+const ENEMY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/enemy-001.png";
+const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/enemy-002.jpeg";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
@@ -149,7 +149,7 @@ export default function Home() {
     if (dialog.complete === "partner") {
       setStory((value) => Math.max(value, 2));
       setCollection((value) => value.includes("ally-001") ? value : [...value, "ally-001"]);
-      setParty((value) => value.includes("ally-001") ? value : [...value, "ally-001"].slice(0, 6));
+      setParty((value) => value.includes("ally-001") ? value : [...value, "ally-001" as const].slice(0, 6));
       setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
     }
     if (dialog.complete === "mission2") {
