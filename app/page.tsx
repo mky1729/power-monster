@@ -31,10 +31,10 @@ type SaveData = { story: number; captured: boolean; fragments?: number[]; collec
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
 const GRID_H = 8;
-const ALLY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/ally-001.jpeg";
-const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/ally-002.jpeg";
-const ENEMY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/enemy-001.png";
-const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monstar/main/public/powermon/enemy-002.jpeg";
+const ALLY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/ally-001.jpeg";
+const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/ally-002.jpeg";
+const ENEMY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-001.png";
+const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-002.jpeg";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
