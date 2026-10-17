@@ -21,14 +21,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type Scene = "title" | "intro" | "map" | "battle" | "battle2" | "result" | "result2";
-type MapId = "lab" | "unknown" | "dream";
+import { type PowmonId, type CardType, type ItemId, CARD_IMAGE_ROOT, cardNames, powmons, getPowmon, powmonName, powmonImage, cardImageFor, captureChance, forestTrees, forestSpots, forestItems, nextForestPowmon } from "@/lib/powmon";
+
+type Scene = "title" | "intro" | "map" | "battle" | "battle2" | "result" | "result2" | "forest-battle" | "forest-result";
+type MapId = "lab" | "unknown" | "dream" | "forest";
 type Position = { x: number; y: number };
 type GameDialog = { lines: string[]; index: number; complete?: "partner" | "mission2" | "none" };
-type PowmonId = "ally-001" | "enemy-001" | "enemy-overdrive";
-type CardType = "monster" | "super";
 type CapturedCards = Partial<Record<PowmonId, CardType>>;
-type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[]; party?: PowmonId[]; evolved?: PowmonId[]; capturedCards?: CapturedCards };
+type SaveData = { story: number; captured: boolean; fragments?: number[]; collection?: PowmonId[]; party?: PowmonId[]; evolved?: PowmonId[]; capturedCards?: CapturedCards; items?: ItemId[] };
 
 const SAVE_KEY = "powermonstar-save-v1";
 const GRID_W = 10;
@@ -37,7 +37,6 @@ const ALLY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main
 const ALLY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/ally-002.jpeg";
 const ENEMY_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-001.png";
 const ENEMY_EVOLVED_IMAGE = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/powermon/enemy-002.jpeg";
-const CARD_IMAGE_ROOT = "https://raw.githubusercontent.com/mky1729/power-monster/main/public/cards";
 
 const introLines = [
   "西暦20XX年。世界各地に、地図に存在しない空間が現れた。",
@@ -88,6 +87,9 @@ export default function Home() {
   const [party, setParty] = useState<PowmonId[]>([]);
   const [evolved, setEvolved] = useState<PowmonId[]>([]);
   const [capturedCards, setCapturedCards] = useState<CapturedCards>({});
+  const [items, setItems] = useState<ItemId[]>([]);
+  const [forestEnemy, setForestEnemy] = useState<PowmonId>("raihin");
+  const [forestCard, setForestCard] = useState<CardType>("monster");
   const [boxOpen, setBoxOpen] = useState(false);
   const [saveExists, setSaveExists] = useState(false);
   const [introIndex, setIntroIndex] = useState(0);
@@ -100,8 +102,8 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (story === 0) return;
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards } satisfies SaveData));
-  }, [story, captured, fragments, collection, party, evolved, capturedCards]);
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards, items } satisfies SaveData));
+  }, [story, captured, fragments, collection, party, evolved, capturedCards, items]);
 
   const startNew = () => {
     window.localStorage.removeItem(SAVE_KEY);
@@ -112,6 +114,7 @@ export default function Home() {
     setParty([]);
     setEvolved([]);
     setCapturedCards({});
+    setItems([]);
     setIntroIndex(0);
     setScene("intro");
   };
@@ -130,11 +133,13 @@ export default function Home() {
     setCollection(legacyCollection);
     setParty(saved.party ?? legacyCollection.slice(0, 6));
     setEvolved(saved.evolved ?? []);
+    setItems(saved.items ?? []);
     setCapturedCards(saved.capturedCards ?? Object.fromEntries(legacyCollection.map((id) => [id, "monster"])) as CapturedCards);
     setMapId("lab");
     setPosition({ x: 4, y: 6 });
     setToast(saved.story >= 5 ? "MISSION 02：ゲートから夢界深層へ向かおう" : saved.captured ? "調査データを確認しよう" : saved.story >= 2 ? "右上のゲートから調査へ向かおう" : "研究員に話しかけよう");
-    setScene(saved.story >= 7 ? "result2" : saved.captured && saved.story === 4 ? "result" : "map");
+    setScene("map");
+    setToast("下の出口から森へ！ 右上のゲートでは物語の続きを遊べます");
   };
 
   const advanceIntro = () => {
@@ -157,7 +162,7 @@ export default function Home() {
       setCollection((value) => value.includes("ally-001") ? value : [...value, "ally-001"]);
       setParty((value) => value.includes("ally-001") ? value : [...value, "ally-001" as const].slice(0, 6));
       setCapturedCards((value) => ({ ...value, "ally-001": value["ally-001"] ?? "monster" }));
-      setToast("パワモンが仲間になった！ 右上のゲートへ向かおう");
+      setToast("相棒が仲間になった！ 下の出口から森へ出かけよう");
     }
     if (dialog.complete === "mission2") {
       setStory(5);
@@ -167,7 +172,7 @@ export default function Home() {
   }, [dialog]);
 
   const saveNow = () => {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards } satisfies SaveData));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ story, captured, fragments, collection, party, evolved, capturedCards, items } satisfies SaveData));
     setToast("この端末にセーブしました ✓");
   };
 
@@ -178,9 +183,10 @@ export default function Home() {
   };
 
   const evolvePowmon = (id: PowmonId) => {
-    if (id === "enemy-overdrive") return;
+    if (!getPowmon(id).evolvedImage) return;
+    if (id === "ninja" && !items.includes("sword")) return;
     setEvolved((value) => value.includes(id) ? value : [...value, id]);
-    setToast(id === "ally-001" ? "シグナル01が新しい姿に進化した！" : "敵パワモン No.001が新しい姿に進化した！");
+    setToast(`${powmonName(id, true)}に進化した！`);
   };
 
   const enterUnknown = useCallback(() => {
@@ -205,14 +211,24 @@ export default function Home() {
     if (x < 1 || x > GRID_W - 2 || y < 1 || y > GRID_H - 2) return true;
     const key = `${x},${y}`;
     if (mapId === "lab") return labBlocked.has(key);
+    if (mapId === "forest") return forestTrees.some(([tx, ty]) => tx === x && ty === y);
     if (unknownBlocked.has(key)) return true;
     if (mapId === "unknown") return !captured && x === 7 && y === 2;
     return fragments.length === 3 && x === 7 && y === 2;
   }, [mapId, captured, fragments.length]);
 
   const move = useCallback((dx: number, dy: number) => {
-    if (scene !== "map" || dialog) return;
+    if (scene !== "map" || dialog || boxOpen) return;
     const next = { x: position.x + dx, y: position.y + dy };
+    if (mapId === "lab" && next.x === 4 && next.y === 7) {
+      if (story < 2) return setToast("まず研究員に話しかけ、相棒を受け取ろう");
+      setMapId("forest"); setPosition({ x: 1, y: 6 });
+      setToast("こもれびの森へ！ パワモンの隣で「調べる」を押そう");
+      return;
+    }
+    if (mapId === "forest" && next.x === 0 && next.y === 6) {
+      setMapId("lab"); setPosition({ x: 4, y: 6 }); setToast("研究施設へ戻った"); return;
+    }
     if (mapId === "lab" && next.x === 8 && next.y === 2) {
       if (story < 2) {
         setToast("ゲートはロックされている。研究員に話を聞こう");
@@ -221,15 +237,17 @@ export default function Home() {
       enterUnknown();
       return;
     }
-    if (mapId !== "lab" && next.x === 1 && next.y === 6) {
+    if (mapId !== "lab" && mapId !== "forest" && next.x === 1 && next.y === 6) {
       enterLab();
       return;
     }
     if (!isBlocked(next.x, next.y)) setPosition(next);
-  }, [dialog, enterLab, enterUnknown, isBlocked, mapId, position, scene, story]);
+  }, [boxOpen, dialog, enterLab, enterUnknown, isBlocked, mapId, position, scene, story]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (boxOpen) return;
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) event.preventDefault();
       if (event.key === "ArrowUp") move(0, -1);
       if (event.key === "ArrowDown") move(0, 1);
       if (event.key === "ArrowLeft") move(-1, 0);
@@ -241,11 +259,22 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advanceDialog, dialog, move]);
+  }, [advanceDialog, boxOpen, dialog, move]);
 
   const interact = () => {
     if (dialog) return advanceDialog();
     const near = (x: number, y: number) => Math.abs(position.x - x) + Math.abs(position.y - y) <= 1;
+    if (mapId === "forest") {
+      const item = forestItems.find((i) => !items.includes(i.id) && near(i.x, i.y));
+      if (item) {
+        setItems((value) => [...value, item.id]);
+        setDialog({ lines: [`${item.name}を見つけた！`, item.effect], index: 0 });
+        setToast(`${item.name}を道具ポーチに入れた`); return;
+      }
+      const spot = forestSpots.find((point) => near(point.x, point.y) && nextForestPowmon(point.pool, collection));
+      if (spot) { setForestEnemy(nextForestPowmon(spot.pool, collection)!); setScene("forest-battle"); return; }
+      setToast("パワモンや光る道具の隣で調べよう。左下の出口から研究施設へ戻れます"); return;
+    }
     if (mapId === "lab" && near(5, 4)) {
       if (story < 2) setDialog({ lines: professorLines, index: 0, complete: "partner" });
       else if (story === 4) setDialog({ lines: mission2Lines, index: 0, complete: "mission2" });
@@ -321,6 +350,20 @@ export default function Home() {
     );
   }
 
+  if (scene === "forest-battle") {
+    return <Battle key={forestEnemy} mode={getPowmon(forestEnemy).boss ? "boss" : "normal"} enemyId={forestEnemy} allyId={party[0] ?? "ally-001"} allyEvolved={evolved.includes(party[0] ?? "ally-001")} items={items} onExit={() => setScene("map")} onVictory={(card) => { catchPowmon(forestEnemy, card); setForestCard(card); setScene("forest-result"); }} />;
+  }
+  if (scene === "forest-result") {
+    return <main className="game-shell result-screen forest-result"><section className="result-card">
+      <p className="eyebrow">FOREST COLLECTION</p>
+      <CardArtwork id={forestEnemy} card={forestCard} className="result-capture-card" />
+      <h1>{powmonName(forestEnemy)}を捕まえた！</h1>
+      <div className="file-number"><UsersRound /> {party.includes(forestEnemy) ? "手持ちに加わった！" : "手持ちがいっぱいなのでBOXへ送った！"}</div>
+      <p>{cardNames[forestCard]}に保管しました。<br />{getPowmon(forestEnemy).note}</p>
+      <Button className="primary-game-button" onClick={() => { setScene("map"); setToast("森のほかの場所も調べてみよう！"); }}>森の探索を続ける</Button>
+    </section></main>;
+  }
+
   if (scene === "battle") {
     return <Battle mode="normal" allyEvolved={evolved.includes("ally-001")} onVictory={(card) => { catchPowmon("enemy-001", card); setCaptured(true); setStory(4); setScene("result"); }} />;
   }
@@ -366,28 +409,30 @@ export default function Home() {
   }
 
   const isMission2 = story >= 5;
-  const areaName = mapId === "lab" ? "パワモン研究施設" : mapId === "dream" ? "夢界深層：反転街区" : "第07アンノウンエリア";
-  const objective = story >= 7
+  const areaName = mapId === "forest" ? "こもれびの森" : mapId === "lab" ? "パワモン研究施設" : mapId === "dream" ? "夢界深層：反転街区" : "第07アンノウンエリア";
+  const objective = mapId === "forest" ? `森のパワモンを集めよう（${collection.filter((id) => !["ally-001", "enemy-001", "enemy-overdrive"].includes(id)).length}/9）` : story >= 7
     ? "主任研究員に深層の調査結果を報告する"
     : isMission2
       ? mapId === "lab" ? "調査ゲートから夢界深層へ向かう" : fragments.length < 3 ? `記憶片を回収する（${fragments.length}/3）` : "出現したオーバードライブ個体を倒す"
-      : captured ? "研究員に調査結果を報告する" : story < 2 ? "主任研究員に話しかける" : mapId === "lab" ? "調査ゲートに入る" : "未知の反応を調査する";
+      : captured ? "研究員に調査結果を報告する" : story < 2 ? "主任研究員に話しかける" : mapId === "lab" ? "下の出口から森へ／右上の調査ゲートへ" : "未知の反応を調査する";
 
   return (
     <main className={`game-shell map-screen ${mapId}`}>
       <header className="game-hud">
         <div><span className="hud-kicker">CURRENT AREA</span><strong>{areaName}</strong></div>
         <div className="hud-actions">
-          <div className="signal-pill"><Radio /> {mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
+          <div className="signal-pill"><Radio /> {mapId === "forest" ? "FOREST" : mapId === "lab" ? "SAFE" : mapId === "dream" ? "DREAMING" : "UNSTABLE"}</div>
           <Button className="hud-icon-button" aria-label="手持ちとパワモンBOXを開く" onClick={() => setBoxOpen(true)}><UsersRound /></Button>
           <Button className="hud-icon-button" aria-label="セーブする" onClick={saveNow}><Save /></Button>
         </div>
       </header>
       <section className="mission-strip">
-        <span>MISSION {isMission2 ? "02" : "01"}</span>
+        <span>{mapId === "forest" ? "EXPLORE" : `MISSION ${isMission2 ? "02" : "01"}`}</span>
         <p>{objective}</p>
       </section>
-      <GameMap mapId={mapId} position={position} captured={captured} fragments={fragments} />
+      <GameMap mapId={mapId} position={position} captured={captured} fragments={fragments} collection={collection} items={items} />
+      {mapId === "forest" && <div className="forest-help">🌿 パワモンの隣で A：調べる ／ 左下の出口：研究施設</div>}
+      {mapId === "lab" && <div className="forest-help">🌳 下の「森へ ↓」から外へ出られます</div>}
       <div className="map-toast" aria-live="polite">{toast}</div>
       <section className="mobile-controls" aria-label="移動操作">
         <div className="dpad">
@@ -405,19 +450,28 @@ export default function Home() {
           <p>{dialog.lines[dialog.index]}</p><ChevronDown />
         </button>
       )}
-      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} party={party} evolved={evolved} capturedCards={capturedCards} onEvolve={evolvePowmon} />
+      <PowmonBox open={boxOpen} onOpenChange={setBoxOpen} collection={collection} party={party} evolved={evolved} capturedCards={capturedCards} items={items} onEvolve={evolvePowmon} onParty={(id) => setParty((value) => [id, ...value.filter((p) => p !== id)].slice(0, 6))} />
     </main>
   );
 }
 
-function GameMap({ mapId, position, captured, fragments }: { mapId: MapId; position: Position; captured: boolean; fragments: number[] }) {
+function GameMap({ mapId, position, captured, fragments, collection, items }: { mapId: MapId; position: Position; captured: boolean; fragments: number[]; collection: PowmonId[]; items: ItemId[] }) {
   const tiles = useMemo(() => Array.from({ length: GRID_W * GRID_H }, (_, index) => index), []);
   return (
     <div className="map-frame">
-      <div className="tile-map" aria-label={mapId === "lab" ? "研究施設マップ" : "異常空間マップ"}>
-        {tiles.map((tile) => <span key={tile} className={`tile tile-${mapId}`} />)}
-        {mapId === "lab" ? (
+      <div className="tile-map" aria-label={mapId === "forest" ? "こもれびの森マップ" : mapId === "lab" ? "研究施設マップ" : "異常空間マップ"}>
+        {tiles.map((tile) => <span key={tile} className={`tile tile-${mapId} ${mapId === "forest" && (Math.floor(tile / GRID_W) === 6 || tile % GRID_W === 4) ? "forest-path" : ""}`} />)}
+        {mapId === "forest" ? (
           <>
+            {forestTrees.map(([x, y]) => <MapObject key={`${x},${y}`} x={x} y={y} className="forest-tree" label="木"><span /></MapObject>)}
+            <MapObject x={0} y={6} className="forest-return" label="研究施設への出口">←</MapObject>
+            <MapObject x={7} y={4} className="forest-pond" label="光る泉"><span /></MapObject>
+            {forestSpots.map((spot) => { const id = nextForestPowmon(spot.pool, collection); return id ? <MapObject key={spot.label} x={spot.x} y={spot.y} className="forest-wild" label={powmonName(id)}><PowmonArtwork id={id} variant="map" /><span className="forest-spot-name">{spot.label}</span></MapObject> : <MapObject key={spot.label} x={spot.x} y={spot.y} className="forest-found" label={`${spot.label}・調査済み`}>✓</MapObject>; })}
+            {forestItems.filter((item) => !items.includes(item.id)).map((item) => <MapObject key={item.id} x={item.x} y={item.y} className="forest-item" label={item.name}><Sparkles /></MapObject>)}
+          </>
+        ) : mapId === "lab" ? (
+          <>
+            <MapObject x={4} y={7} className="forest-door" label="森への出口">森へ ↓</MapObject>
             <MapObject x={5} y={4} className="researcher" label="主任研究員"><FlaskConical /></MapObject>
             <MapObject x={8} y={2} className="gate" label="調査ゲート"><span className="gate-ring" /></MapObject>
             <MapObject x={1} y={1} className="lab-console wide" label="解析装置"><span /></MapObject>
@@ -467,29 +521,24 @@ function CharacterArtwork({ side, variant = "battle", evolved = false }: { side:
   );
 }
 
-function cardImageFor(id: PowmonId, card: CardType, evolved = false) {
-  if (id === "ally-001") return `${CARD_IMAGE_ROOT}/monster_card_${evolved ? "raihou" : "raiden"}.jpg`;
-  const monsterName = id === "enemy-overdrive" || evolved ? "deruberos" : "houwan";
-  return `${CARD_IMAGE_ROOT}/${card}_card_${monsterName}.jpg`;
+function PowmonArtwork({ id, evolved = false, variant = "battle", side = "enemy" }: { id: PowmonId; evolved?: boolean; variant?: "battle" | "map"; side?: "ally" | "enemy" }) {
+  return <div className={`character-art species-art ${side} ${variant}`}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={powmonImage(id, evolved)} alt={powmonName(id, evolved)} draggable={false} />
+  </div>;
 }
 
 function CardArtwork({ id, card, evolved = false, className = "" }: { id: PowmonId; card: CardType; evolved?: boolean; className?: string }) {
-  const cardName = card === "super" ? "スーパーカード" : "モンスターカード";
-  return (
-    <div className={`powmon-card-art ${card} ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={cardImageFor(id, card, evolved)} alt={`${cardName}に入ったパワモン`} draggable={false} />
-      <span>{cardName}</span>
-    </div>
-  );
+  const image = cardImageFor(id, card, evolved);
+  return <div className={`powmon-card-art ${card} ${image ? "" : "composed-card"} ${className}`}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={image ?? powmonImage(id, evolved)} alt={`${cardNames[card]}に入った${powmonName(id, evolved)}`} draggable={false} />
+    <span>{cardNames[card]}</span>
+  </div>;
 }
 
-function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCards, onEvolve }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[]; party: PowmonId[]; evolved: PowmonId[]; capturedCards: CapturedCards; onEvolve: (id: PowmonId) => void }) {
-  const entries: Array<{ id: PowmonId; side: "ally" | "enemy"; name: string; note: string }> = [
-    { id: "ally-001", side: "ally", name: "シグナル01", note: "最初にリンクした相棒" },
-    { id: "enemy-001", side: "enemy", name: "敵パワモン No.001", note: "消失街区で捕獲" },
-    { id: "enemy-overdrive", side: "enemy", name: "OVERDRIVE個体", note: "夢界深層で捕獲" },
-  ];
+function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCards, items, onEvolve, onParty }: { open: boolean; onOpenChange: (open: boolean) => void; collection: PowmonId[]; party: PowmonId[]; evolved: PowmonId[]; capturedCards: CapturedCards; items: ItemId[]; onEvolve: (id: PowmonId) => void; onParty: (id: PowmonId) => void }) {
+  const entries = powmons;
   const caughtEntries = entries.filter((entry) => collection.includes(entry.id));
   const partyEntries = party.flatMap((id) => entries.filter((entry) => entry.id === id));
   const boxEntries = caughtEntries.filter((entry) => !party.includes(entry.id));
@@ -507,14 +556,15 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCar
             {Array.from({ length: 6 }, (_, index) => {
               const entry = partyEntries[index];
               const hasEvolved = entry ? evolved.includes(entry.id) || entry.id === "enemy-overdrive" : false;
-              const canEvolve = entry ? entry.id !== "enemy-overdrive" && !hasEvolved : false;
+              const canEvolve = entry ? Boolean(entry.evolvedImage) && !hasEvolved && (entry.id !== "ninja" || items.includes("sword")) : false;
               return entry ? (
                 <article key={entry.id} className={`party-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""} ${hasEvolved ? "evolved-card" : ""}`}>
                   <CardArtwork id={entry.id} card={capturedCards[entry.id] ?? "monster"} evolved={hasEvolved} />
-                  <strong>{entry.name}{hasEvolved && entry.id !== "enemy-overdrive" ? "・進化形" : ""}</strong>
+                  <strong title={powmonName(entry.id, hasEvolved)}>{powmonName(entry.id, hasEvolved)}</strong>
+                  <button className="party-lead" onClick={() => onParty(entry.id)} disabled={index === 0}>{index === 0 ? "先頭・戦闘に出る" : "先頭にする"}</button>
                   {canEvolve ? (
                     <Button className="evolve-button" size="sm" onClick={() => onEvolve(entry.id)}><Sparkles />進化する</Button>
-                  ) : hasEvolved && <span className="evolved-badge"><Sparkles />進化済み</span>}
+                  ) : hasEvolved ? <span className="evolved-badge"><Sparkles />進化済み</span> : entry.id === "ninja" && <small className="item-hint">伝説の剣で進化</small>}
                 </article>
               ) : <div key={`empty-${index}`} className="party-slot-empty"><span>{index + 1}</span><small>あき</small></div>;
             })}
@@ -525,11 +575,12 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCar
           {boxEntries.map((entry) => (
             <article key={entry.id} className={`powmon-box-card ${entry.id === "enemy-overdrive" ? "overdrive-card" : ""}`}>
               <CardArtwork id={entry.id} card={capturedCards[entry.id] ?? "monster"} evolved={evolved.includes(entry.id) || entry.id === "enemy-overdrive"} />
-              <div><strong>{entry.name}{evolved.includes(entry.id) ? "・進化形" : ""}</strong><span>{entry.note}・{capturedCards[entry.id] === "super" ? "スーパーカード" : "モンスターカード"}</span></div>
+              <div><strong>{powmonName(entry.id, evolved.includes(entry.id))}</strong><span>{entry.note}・{cardNames[capturedCards[entry.id] ?? "monster"]}</span><button className="party-lead" onClick={() => onParty(entry.id)}>手持ちの先頭にする{party.length >= 6 ? "（最後の1体はBOXへ）" : ""}</button>{entry.evolvedImage && !evolved.includes(entry.id) && (entry.id !== "ninja" || items.includes("sword")) && <Button className="evolve-button" onClick={() => onEvolve(entry.id)}>進化する</Button>}</div>
             </article>
           ))}
           {boxEntries.length === 0 && <p className="box-empty">手持ちに入りきらないパワモンは、ここへ送られます。</p>}
         </div>
+        <section className="item-pouch"><h3>道具ポーチ</h3>{forestItems.map((item) => <div key={item.id} className={items.includes(item.id) ? "found-item" : "missing-item"}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={item.image} alt={item.name} /><span><strong>{item.name}</strong><small>{items.includes(item.id) ? item.effect : "森で見つけよう"}</small></span></div>)}</section>
         <p className="box-save-help"><Save /> 進化した姿も自動保存されます。進化後は元の姿には戻せません。</p>
       </DialogContent>
     </Dialog>
@@ -539,9 +590,9 @@ function PowmonBox({ open, onOpenChange, collection, party, evolved, capturedCar
 type Intent = "charge" | "attack" | "guard";
 type MoveId = "rush" | "break" | "counter" | "link";
 
-function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) => void; mode: "normal" | "boss"; allyEvolved: boolean }) {
+function Battle({ onVictory, mode, allyEvolved, enemyId, allyId = "ally-001", items = [], onExit }: { onVictory: (card: CardType) => void; mode: "normal" | "boss"; allyEvolved: boolean; enemyId?: PowmonId; allyId?: PowmonId; items?: ItemId[]; onExit?: () => void }) {
   const isBoss = mode === "boss";
-  const playerMaxHp = isBoss ? 42 : 36;
+  const playerMaxHp = (isBoss ? 42 : 36) + (items.includes("muffler") ? 8 : 0);
   const enemyMaxHp = isBoss ? 66 : 42;
   const [playerHp, setPlayerHp] = useState(playerMaxHp);
   const [enemyHp, setEnemyHp] = useState(enemyMaxHp);
@@ -562,8 +613,8 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) 
   const attemptCapture = (card: CardType) => {
     if (captureLocked) return;
     setCaptureLocked(true);
-    const chance = isBoss ? (card === "super" ? 0.75 : 0.45) : (card === "super" ? 0.9 : 0.7);
-    setMessage(`${card === "super" ? "スーパーカード" : "モンスターカード"}を展開！`);
+    const chance = captureChance(card, isBoss);
+    setMessage(`${cardNames[card]}を展開！`);
     window.setTimeout(() => {
       if (Math.random() < chance) {
         setMessage("カードリンク成功！ パワモンを捕まえた！");
@@ -604,8 +655,10 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) 
     }
     if (intent === "attack") playerDamage = move === "counter" ? 2 : isBoss ? 13 : 10;
     if (intent === "charge" && move !== "rush") actionText += " 敵の力が増幅していく…";
+    if (damage > 0 && items.includes("glasses")) damage += 2;
+    if (damage > 0 && allyEvolved) damage += 2;
     const nextEnemyHp = Math.max(0, enemyHp - damage);
-    const nextPlayerHp = Math.max(0, playerHp - playerDamage);
+    const nextPlayerHp = Math.max(0, playerHp - (nextEnemyHp === 0 ? 0 : playerDamage));
     setMessage(actionText); setEnemyHp(nextEnemyHp); setPlayerHp(nextPlayerHp); setPower(nextPower);
     window.setTimeout(() => {
       if (nextEnemyHp === 0) { setWon(true); setMessage(isBoss ? "オーバードライブ停止！ 深層コアを安定化できる！" : "未知のパワモンからリンク信号を検出！"); }
@@ -619,7 +672,7 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) 
     <main className={`game-shell battle-screen ${isBoss ? "boss-battle" : ""}`}>
       <div className="battle-noise" />
       <header className="battle-header">
-        <div><span>{isBoss ? "BOSS ENCOUNTER" : "ENCOUNTER"}</span><strong>{isBoss ? "OVERDRIVE SIGNAL" : "UNKNOWN SIGNAL"}</strong></div>
+        <div><span>{isBoss ? "BOSS ENCOUNTER" : "ENCOUNTER"}</span><strong>{enemyId ? "こもれびの森" : isBoss ? "OVERDRIVE SIGNAL" : "UNKNOWN SIGNAL"}</strong></div>
         <div className={`intent-badge ${intent}`}>
           {intent === "attack" ? <Swords /> : intent === "guard" ? <Shield /> : <Zap />}
           <span>NEXT<strong>{intentLabel}</strong></span>
@@ -627,33 +680,28 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) 
       </header>
       <section className="battle-field">
         <div className="enemy-unit">
-          <div className="unit-info enemy-info"><span>{isBoss ? "夢界深層・敵性反応" : "未確認個体"}</span><strong>{isBoss ? "OVERDRIVE" : "UNKNOWN"}</strong><HpBar value={enemyHp} max={enemyMaxHp} /></div>
-          <CharacterArtwork side="enemy" evolved={isBoss} />
+          <div className="unit-info enemy-info"><span>{isBoss ? "夢界深層・敵性反応" : "未確認個体"}</span><strong>{enemyId ? powmonName(enemyId) : isBoss ? "OVERDRIVE" : "UNKNOWN"}</strong><HpBar value={enemyHp} max={enemyMaxHp} /></div>
+          {enemyId ? <PowmonArtwork id={enemyId} /> : <CharacterArtwork side="enemy" evolved={isBoss} />}
         </div>
         <div className="player-unit">
-          <CharacterArtwork side="ally" evolved={allyEvolved} />
-          <div className="unit-info player-info"><span>リンク個体</span><strong>シグナル01</strong><HpBar value={playerHp} max={playerMaxHp} /></div>
+          <PowmonArtwork id={allyId} evolved={allyEvolved} side="ally" />
+          <div className="unit-info player-info"><span>リンク個体</span><strong>{powmonName(allyId, allyEvolved)}</strong><HpBar value={playerHp} max={playerMaxHp} /></div>
         </div>
       </section>
       <section className="battle-console">
         <div className="battle-message" aria-live="polite">{message}</div>
         <div className="power-meter"><span>POWER</span><div>{Array.from({ length: 5 }, (_, index) => <i key={index} className={index < power ? "filled" : ""} />)}</div></div>
-        {playerHp === 0 ? (
+        {playerHp === 0 && !won ? (
           <Button className="primary-game-button battle-retry" onClick={resetBattle}><RotateCcw /> 再接続する</Button>
         ) : won ? (
           <div className="capture-panel" aria-label="捕獲カードを選ぶ">
             <p>捕まえるカードを選ぼう</p>
             <div className="capture-card-grid">
-              <button disabled={captureLocked} onClick={() => attemptCapture("monster")} className="capture-card-choice monster">
+              {(["monster", "super", "rare"] as CardType[]).map((card) => <button key={card} disabled={captureLocked} onClick={() => attemptCapture(card)} className={`capture-card-choice ${card}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`${CARD_IMAGE_ROOT}/monster_card.jpg`} alt="普通のモンスターカード" />
-                <span><strong>モンスターカード</strong><small>標準の捕獲率</small></span>
-              </button>
-              <button disabled={captureLocked} onClick={() => attemptCapture("super")} className="capture-card-choice super">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`${CARD_IMAGE_ROOT}/super_card.jpg`} alt="青いスーパーカード" />
-                <span><strong>スーパーカード</strong><small>捕まえやすい</small></span>
-              </button>
+                <img src={`${CARD_IMAGE_ROOT}/${card === "monster" ? "monster" : "super"}_card.jpg`} alt={cardNames[card]} />
+                <span><strong>{cardNames[card]}</strong><small>捕獲率 {Math.round(captureChance(card, isBoss) * 100)}％</small></span>
+              </button>)}
             </div>
           </div>
         ) : (
@@ -664,6 +712,7 @@ function Battle({ onVictory, mode, allyEvolved }: { onVictory: (card: CardType) 
             <Button disabled={locked || power < 5} onClick={() => performMove("link")} className="move-button link-move"><Sparkles /><span><strong>パワーリンク</strong><small>最大出力・POWER -5</small></span></Button>
           </div>
         )}
+        {onExit && <Button className="forest-battle-exit" disabled={locked || captureLocked} onClick={onExit}>森へ戻る</Button>}
       </section>
     </main>
   );

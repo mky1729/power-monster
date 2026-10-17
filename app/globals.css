@@ -689,3 +689,56 @@ button {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Outdoor exploration */
+.map-screen.forest { background: linear-gradient(#123d31, #0a221d 68%, #071c18); }
+.forest .game-hud strong { color: #efffc9; }
+.forest .signal-pill { border-color: #abdf83; color: #d4ffab; background: #244e30; }
+.forest .mission-strip { background: #163b2a; border-color: #56855b; }
+.forest .mission-strip > span { background: #d0f397; }
+.forest .map-frame { border-color: #80a85a; box-shadow: 0 10px 30px #0005; }
+.tile-forest { background: radial-gradient(ellipse at 25% 70%, #8ac968 0 6%, transparent 8%), linear-gradient(145deg, #579d4c, #4a9144); border-color: #a7e98c0e; }
+.tile-forest:nth-child(3n) { background: radial-gradient(ellipse at 60% 30%, #cfde7b 0 5%, transparent 8%), #65a24d; }
+.forest .tile-forest.forest-path { background: radial-gradient(circle at 30% 35%, #c7b583 0 6%, transparent 8%), #b5a06e; box-shadow: inset 0 0 12px #8d8d4c55; }
+.forest .tile-map .tile:nth-child(-n+10), .forest .tile-map .tile:nth-child(n+71), .forest .tile-map .tile:nth-child(10n+1), .forest .tile-map .tile:nth-child(10n) { background: radial-gradient(ellipse at 30% 30%, #3d793e 0 35%, #235b36 38% 65%, #1a432e 68%); box-shadow: inset 0 0 10px #163c28; }
+.forest-tree { z-index: 3; overflow: visible; }
+.forest-tree::before { content: ''; position: absolute; bottom: 8%; width: 19%; height: 55%; background: #634d34; box-shadow: 4px 4px #284c2999; }
+.forest-tree > span { position: absolute; top: -18%; width: 110%; height: 95%; border-radius: 45% 48% 35% 38%; background: radial-gradient(ellipse at 30% 22%, #8ab75e 0 20%, #4c8d48 24% 52%, #2d653b 58%); box-shadow: 3px 6px #183f3260; }
+.forest-wild { z-index: 4; overflow: visible; }
+.forest-wild .character-art { width: 85%; height: 85%; border-radius: 8px; border-color: #e5f3aa; filter: drop-shadow(0 2px 4px #13351c80); }
+.forest-wild .species-art img { object-fit: contain; transform: none; object-position: center; }
+.forest-spot-name { position: absolute; top: 90%; z-index: 6; padding: 1px 3px; border-radius: 3px; background: #153f23ec; color: #f1ffde; font-size: clamp(6px, 1.8vw, 9px); white-space: nowrap; }
+.forest-item { z-index: 5; color: #fff3a2; filter: drop-shadow(0 0 6px #ffffa0); animation: fragment-pulse 2s infinite; }
+.forest-found { color: #e0f7a3; font-size: 16px; background: #49783f88; border-radius: 50%; transform: scale(.55); }
+.forest-pond { border-radius: 40%; background: #7dded4; box-shadow: 0 0 0 3px #b5d891, inset 0 0 9px #2787a1; transform: scale(1.7); }
+.forest-return { z-index: 5; background: #c5ad77; color: #253b22; font-size: 24px; }
+.forest-door { width: 20%; color: #e4ffc1; background: #2a693f; border: 1px solid #96b867; font-size: 10px; z-index: 4; }
+.forest-help { margin-top: 6px; padding: 5px; color: #cbe9ae; font-size: 10px; text-align: center; }
+.forest-result { background: radial-gradient(ellipse at top, #315c32, #071a18); overflow-y: auto; }
+.species-art img, .character-art.species-art.ally img, .character-art.species-art.enemy img { object-fit: contain; object-position: center; transform: none; }
+.unit-info > strong { font-family: inherit; font-size: 12px; overflow-wrap: anywhere; }
+.battle-screen { overflow-y: auto; }
+.capture-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.capture-card-choice strong { font-size: 9px; white-space: normal; min-height: 26px; }
+.capture-card-choice.rare { border-color: #b29aff; background: #2d1c48; box-shadow: inset 0 0 8px #c7aaff45; }
+.capture-card-choice.rare img { outline: 2px solid #ba98ff; outline-offset: -3px; }
+.powmon-card-art.rare { border: 2px solid #bc98ff; box-shadow: 0 0 14px #b68dff55; }
+.powmon-card-art.rare > span { color: #e0c7ff; }
+.powmon-card-art.composed-card { padding: 7px; border-width: 4px; background: #fff1b6; }
+.powmon-card-art.composed-card.super { background: #bde6ff; }
+.powmon-card-art.composed-card.rare { background: #e0d1ff; }
+.composed-card img { border-radius: 4px; background: white; }
+.forest-battle-exit { width: 100%; margin-top: 6px; height: 30px; color: #bbd5c6 !important; background: #122b26 !important; border: 1px solid #395d4d; }
+.party-card { height: auto; min-height: 168px; padding: 6px 0; }
+.party-lead { padding: 4px 5px; border-radius: 4px; border: 1px solid #5c917c; background: #163c31; color: #d0f8d6; font-size: 9px; cursor: pointer; }
+.party-lead:disabled { opacity: .65; cursor: default; }
+.item-hint { font-size: 8px; color: #eacb86; }
+.item-pouch { display: grid; gap: 6px; }
+.item-pouch h3 { font-size: 13px; color: #bfe8be; }
+.item-pouch > div { display: flex; gap: 9px; align-items: center; padding: 6px; border: 1px solid #31554b; background: #10251e; }
+.item-pouch img { width: 50px; height: 46px; object-fit: contain; border-radius: 4px; background: white; }
+.item-pouch span { display: flex; flex-direction: column; gap: 4px; }
+.item-pouch strong { font-size: 11px; }
+.item-pouch small { font-size: 9px; color: #a2b9b2; }
+.item-pouch .missing-item { opacity: .45; }
+@media (max-height: 740px) { .forest .tile-map { max-height: calc(100dvh - 320px); min-height: 220px; aspect-ratio: auto; } .forest .game-hud strong { font-size: 13px; } }
